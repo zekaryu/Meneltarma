@@ -1,0 +1,33 @@
+---
+layout: category
+---
+
+<div>
+
+  <ul class="post-list">
+    {% for post in site.posts %}
+     {% if post.categories[0] == "git" %}
+      <li>
+        {% assign date_format = site.cayman-blog.date_format | default: "%b %-d, %Y" %}
+        <span class="post-meta">{{ post.date | date: date_format }}</span>
+        <a class="post-link" href="{{ post.url | relative_url }}" title="{{ post.title }}">{{ post.title | escape }}</a>
+        <span>{{ post.excerpt | markdownify | truncatewords: 30 }}</span>
+      </li>
+      {% endif %}
+    {% endfor %}
+  </ul>
+
+</div>
+<script src="/assets/js/jquery-1.7.2.min.js" type="text/javascript" charset="utf-8"></script>
+
+<script type="text/javascript" charset="utf-8">
+  var count=0;
+  {% for post in site.posts %}
+   {% if post.categories[0] == category %}
+     count++;
+   {% endif %}
+  {% endfor %}
+  alert(count);
+  $("#title").append("("+count +")")
+
+</script>

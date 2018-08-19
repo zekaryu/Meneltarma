@@ -1,0 +1,11 @@
+- url: diary
+  title: 日记
+
+- url: personal
+  title: 个人
+
+- url: java
+  title: 编程
+
+- url: jekyll
+  title: 博客
