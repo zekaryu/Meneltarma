@@ -19,7 +19,7 @@ description: >- # this means to ignore newlines until "baseurl:"
   这是我的个人技术博客，包括平时工作中自己的总结，外文翻译，源码分析等等。
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "" # the base hostname & protocol for your site, e.g. http://example.com
-twitter_username: 
+twitter_username:
 github_username:  zekaryu
 
 google_analytics:
@@ -37,6 +37,8 @@ plugins:
 
 paginate: 5
 paginate_path: "/page:num"
+
+excerpt_separator: '\n'
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.
