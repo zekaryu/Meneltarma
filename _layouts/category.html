@@ -2,10 +2,9 @@
 layout: default
 ---
 
-  <h2>总数：{{paginator.total_posts }} </h2>
   {% for map in site.data.urlmap%}
-     <a class="page-link" id="{{map.url}}" href="{{site.url}}/catogories/{{ map.url }}">{{map.title}} </a>
-     {% endfor%}
+     <a class="page-link" id="{{map.url}}" href="{{site.url}}/catogories/{{ map.url }}">{{map.title}}(0) </a> &nbsp;
+  {% endfor%}
 <div>
   <div>&nbsp;</div>
 
@@ -13,8 +12,7 @@ layout: default
 </div>
 <script src="/assets/js/jquery-1.7.2.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript" charset="utf-8">
-  var map = new Map();
   {% for category in site.categories %}
-    $("#"+"{{category | first}}").append("("+  {{category | last | size }} +")")
+  $("#"+"{{category | first}}").html($("#"+"{{category | first}}").html().replace("0","{{category | last | size }}"));
   {% endfor %}
 </script>

@@ -38,7 +38,7 @@ plugins:
 paginate: 5
 paginate_path: "/page:num"
 
-excerpt_separator: '\n'
+excerpt_separator: "\n"
 # Exclude from processing.
 # The following items will not be processed, by default. Create a custom list
 # to override the default setting.

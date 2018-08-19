@@ -4,9 +4,7 @@ title: 博客
 ---
 
 <div>
-
-  <h2 id="title">博客</h2>
-
+  <h2 id="title">netty</h2>
   <ul class="post-list">
     {% for post in site.posts %}
      {% if post.categories[0] == "jekyll" %}
@@ -21,6 +19,7 @@ title: 博客
   </ul>
 
 </div>
+
 <script src="/assets/js/jquery-1.7.2.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript" charset="utf-8">
   var count=0;
@@ -29,6 +28,5 @@ title: 博客
      count++;
    {% endif %}
   {% endfor %}
-  $("#title").append("("+count +")")
-
+  $("#title").append("("+count+")")
 </script>

@@ -4,8 +4,7 @@ title: 编程
 ---
 
 <div>
-  <h2 id="title">编程</h2>
-
+  <h2 id="title">netty</h2>
   <ul class="post-list">
     {% for post in site.posts %}
      {% if post.categories[0] == "java" %}
@@ -18,7 +17,9 @@ title: 编程
       {% endif %}
     {% endfor %}
   </ul>
+
 </div>
+
 <script src="/assets/js/jquery-1.7.2.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript" charset="utf-8">
   var count=0;
@@ -27,6 +28,5 @@ title: 编程
      count++;
    {% endif %}
   {% endfor %}
-  $("#title").append("("+count +")")
-
+  $("#title").append("("+count+")")
 </script>

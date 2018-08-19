@@ -7,7 +7,7 @@ title: netty
   <h2 id="title">netty</h2>
   <ul class="post-list">
     {% for post in site.posts %}
-     {% if post.categories[0] == "diary" %}
+     {% if post.categories[0] == "netty" %}
       <li>
         {% assign date_format = site.cayman-blog.date_format | default: "%b %-d, %Y" %}
         <span class="post-meta">{{ post.date | date: date_format }}</span>
@@ -24,7 +24,7 @@ title: netty
 <script type="text/javascript" charset="utf-8">
   var count=0;
   {% for post in site.posts %}
-   {% if post.categories[0] == "diary" %}
+   {% if post.categories[0] == "netty" %}
      count++;
    {% endif %}
   {% endfor %}
