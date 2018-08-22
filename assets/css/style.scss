@@ -2,3 +2,10 @@
 ---
 
 @import 'jekyll-theme-cayman-blog';
+
+p{
+text-indent: 2em; /*首行缩进*/
+}
+img{
+  display: block;
+}
