@@ -4,7 +4,8 @@ title:  "netty 源码解读二 ByteBufAllocator 接口"
 date:   2018-08-23 14:56:17 +0800
 categories: [netty]
 ---
->在上一篇 [netty 源码解读之一](https://www.numenor.cn/netty/2018/08/18/netty(1)-ByteBuf-interface.html) ByteBuf 接口 中我们解读了一遍 ByteBuf 源码，应该对这个 netty 中最核心的缓存数据结构有所了解了。但我们在前文发现 ByteBuf 中没有用于创建 ByteBuf 本身的方法，今天我们就来解读一下 netty 中用于创建 ByteBuf 的辅助接口 ByteBufAllocator 及其体系结构。
+>在上一篇 [netty 源码解读之一](https://www.numenor.cn/netty/2018/08/18/netty(1)-ByteBuf-interface.html) ByteBuf 接口 中我们解读了一遍 ByteBuf 源码
+，应该对这个 netty 中最核心的缓存数据结构有所了解了。但我们在前文发现 ByteBuf 中没有用于创建 ByteBuf 本身的方法，今天我们就来解读一下 netty 中用于创建 ByteBuf 的辅助接口 ByteBufAllocator 及其体系结构。
 
 ## 首先看一下 ByteBufAllocator 家族体系：
 ![ByteBufAllocator 家族体系](http://meneltarma-pictures.nos-eastchina1.126.net/netty/netty-source-2/ByteBufAllocator%20hierarchy.png)

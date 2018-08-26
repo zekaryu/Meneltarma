@@ -11,4 +11,10 @@
   title: 博客
 
 - url: netty
-  title: netty
+  title: netty4
+
+- url: build
+  title: 项目构建
+
+- url: designpattern
+  title: 设计模式
