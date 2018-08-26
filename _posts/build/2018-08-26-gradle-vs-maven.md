@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "Gradle VS Maven 比较（官方文档翻译）英文水平有限"
-date:   2018-08-26 17:56:17 +0800
+date:   2018-08-26 17:46:17 +0800
 categories: [build]
 ---
 >以下是对 Gradle 和 Apache Maven 之间主要不同点的总结，
