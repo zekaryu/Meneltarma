@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "命令模式使用场景"
-date:   2018-08-26 16:56:17 +0800
+date:   2017-08-26 16:56:17 +0800
 categories: [designpattern]
 ---
 

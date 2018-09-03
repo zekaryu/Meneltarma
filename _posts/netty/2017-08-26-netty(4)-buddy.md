@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "netty 源码解读三 内存分配相关（2）-buddy 伙伴内存分配算法"
-date:   2018-08-26 16:36:17 +0800
+date:   2017-08-26 16:36:17 +0800
 categories: [netty]
 ---
 
