@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "netty 源码解读二 ByteBufAllocator 接口"
-date:   2018-08-23 14:56:17 +0800
+date:   2017-08-23 14:56:17 +0800
 categories: [netty]
 ---
 >在上一篇 [netty 源码解读之一](https://www.numenor.cn/netty/2018/08/18/netty(1)-ByteBuf-interface.html) ByteBuf 接口 中我们解读了一遍 ByteBuf 源码
