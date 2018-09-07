@@ -592,7 +592,7 @@ private boolean cleanSomeSlots(int i, int n) {
     return removed;
 }
 ```
-cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择了一个从某索引开始的扫描次数进行全局清理。
+cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择从某索引开始 log2(n) 扫描次数进行全局清理，如果过程中真遇到需要清理的过期 stale entry，扫描次数会额外增加 log2(table.length)-1 次。
 
 然后再看一下最后一个与 set 有关的方法 replaceStaleEntry：
 ```java
