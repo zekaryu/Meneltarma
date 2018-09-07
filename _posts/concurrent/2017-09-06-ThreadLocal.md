@@ -316,7 +316,7 @@ private static int nextHashCode() {
 2. Full slot = Full entry ：表示 table 中某个索引存放了一个 entry ，并且该 entry 的 WeakReference key 不为null ，且指向某个 threadlocalObj；
 3. Stale slot = Stale entry ： 字面意思为陈旧的 entry， 表示 table 中某个索引存放了一个陈旧的 entry ， 并且该 entry 的 WeakReference key 为 null。既然是“陈旧”的 entry ， 自然就是无效的需要清理的 entry；
 4. null slot ：表示 table 中某个索引位置为 null 不指向任何 entry ， 可用于设置新的 entry；
-5. run ： table 中两个 null slot 之间的序列
+5. run ： table 中两个连续两个 null slot 之间的序列
 
 ####  get
 
@@ -418,6 +418,135 @@ private void set(ThreadLocal<?> key, Object value) {
         rehash();
 }
 ```
+set() 中 replaceStaleEntry 和 cleanSomeSlots 方法最终调用了 expungeStaleEntry 方法，可以说 expungeStaleEntry 是 map 清理的核心算法：
+```java
+/**
+ * 首先清理 staleSlot 位置的过期 entry，然后开始扫描从 staleSlot 一直到下一个
+ * null slot 之间所有位置，因为有位置空出来，这里多做了一步操作就是 rehash 这些位置中的有效 entry
+ * 使他们尽量连续排雷并靠近他们的 hashcode 所在位置，而将所有 null slot 也往后排在一起。
+ *
+ * @param staleSlot index of slot known to have null key
+ * @return the index of the next null slot after staleSlot
+ * (all between staleSlot and this slot will have been checked
+ * for expunging).
+ */
+private int expungeStaleEntry(int staleSlot) {
+    Entry[] tab = table;
+    int len = tab.length;
+
+    // expunge entry at staleSlot
+    // 首先清理 staleslot 位置的 entry，处理之后 staleslot 变为 null slot
+    // 将 entry 的 value 置为 null ， 帮助 gc 回收
+    tab[staleSlot].value = null;
+    // 将 entry 置为 null ，帮助 gc 回收
+    tab[staleSlot] = null;
+    // table 元数减少
+    size--;
+
+    // Rehash until we encounter null
+    // 从 staleslot 的下一个位置开始遍历直到遇到 null slot
+    Entry e;
+    int i;
+    for (i = nextIndex(staleSlot, len);
+         (e = tab[i]) != null;
+         i = nextIndex(i, len)) {
+        // entry 不为 null
+        ThreadLocal<?> k = e.get();
+        // entry 为 stale entry ，则清除 entry 使之成为 null slot
+        if (k == null) {
+            e.value = null;
+            tab[i] = null;
+            size--;
+        // entry 为有效的 full entry，则 rehash
+        } else
+            // 计算 hashcode
+            int h = k.threadLocalHashCode & (len - 1);
+            // 如果 entry 原本就在其对应 hashcode 所在的位置，则不做操作，完美！
+            // 如果 entry 所在的位置与其对应 h 不一致，则说明此 entry 在 set 的时候
+            // 就遇到了 hash 冲突，而通过线性探测放到了其他位置，而这个时候因为清除
+            // 过期 entry 可能有 null slot 空出来，所以重新安排其位置
+            if (h != i) {
+                // 将指向当前 entry 的 tab[i] 置为 null
+                tab[i] = null;
+
+                // Unlike Knuth 6.4 Algorithm R, we must scan until
+                // null because multiple entries could have been stale.
+                // 与 Knuth 《计算机程序设计艺术》6.4 的 R 算法不同，R 算法是关于在散列表中删除一个
+                // 元素算法，简要过程如下：在一个一维开放散列表中，假如 i 索引的元素为 null ，则从 i
+                // 开始反向寻找第一个不为 null 的元素如果还要判断其 hashcode 是否满足相关条件在决定
+                // 是否将其与 i 索引位置的 null 元素交换。原则就是尽量将所有不为 null 元素从散列表头
+                // 开始连续排列，将 null 元素在散列表尾连续排列。对 R 算法有兴趣，可以自行搜索相关文献。
+
+                // 本算法由于散列表中过期需要置为 null 元素可能不止一个，所以如果完全按 R 算法执行会
+                // 出现相同 hashcode 的 entry 之间出现 null slot 这是不允许的，因为 ThreadLoacl 中
+                // 所有线性探测都是步长为 1 的，也就是稳定状态的 threadlocalmap 只有具有不同的 hashcode
+                // 的 entry 之间才有可能出现 null slot ，其他临时状态只要相同的 hashcode 的 entry 之
+                // 间出现  stale entry 马上就会被清理，然后被其他 rehash 之后的 entry 填满
+
+                // 从原始 h 索引开始寻找一个下一个可以放置当前 entry 的位置不断更新的 h
+                while (tab[h] != null)
+                    h = nextIndex(h, len);
+                // 找到之后将 e 赋值给 tab[h]
+                // 个人觉得 if 代码块可以换一种写法，因为这里寻找合适的 null slot 是从
+                // h 开始，如果原始 h 和 i 之间没有 stale entry 都是有效的，那么其实结果
+                // 就是将 entry 又放回原处，所以我觉得可以这么写：
+                //   while (tab[h] != null)
+                //       h = nextIndex(h, len);
+                //   if(h != i){
+                //       tab[i] = null;
+                //       tab[h] = e;
+                //   }
+                // 这样当过期的 entry 很少的时候每次 h == i 的时候回减少两次引用赋值，不过效果还得看实践
+                // -------------------------------------------------------------
+                // 半小时后，我发现我的这种想法是错误的，原因如下：
+                // 1.假设原本具有相同 h 的元素个数 n >=2 ，则 staleslot 清空之后，另外 n-1 个元素必然要各自向
+                //   前移动一位，所以不存在 h == i 的情况
+                // 2.假设原本具有相同 h 的元素个数 n =1 ，则 staleslot 清空之后，没有其他元素需要 handle
+                // -----------------------------------------------------------
+                // 再仔细一思考，发现这个想法并没有错误，举例说明
+                //
+                // h = staleSlot = hash(A1)=hash(A2)=hash(A3)=hash(A4)
+                // h+5 = hash(B1)=hash(B2)=hash(B3)=hash(B4)=hash(B5)
+                //
+                // CASE 1 : 两组不同 hashcode 不连续，之间有 null slot 间隔
+                //
+                // staleSlot
+                //     h     h+1   h+2   h+3    h+4    h+5   h+6   h+7   h+8   h+9
+                //    [A1]  [A2]  [A3]  [A4]   [null]  [B1]  [B2]  [B3]  [B4]  [B5]
+                //                                  |                                  步骤1：清理
+                //  [null]  [A2]  [A3]  [A4]   [null]  [B1]  [B2]  [B3]  [B4]  [B5]
+                //         /     /     /            |                                  步骤2：Rehash
+                //    [A2]  [A3]  [A4]  [null] [null]  [B1]  [B2]  [B3]  [B4]  [B5]
+                //
+                //  CASE 1 中，清理从 h 开始到 h+3 结束，对其中元素而言 h 永远不等于 i ，所以清理 A1 之后，
+                // 只有的每个元素都需要移动。B1-B5 元素没有被扫描到。
+
+                //  CASE 2 : 两组不同 hashcode 连续，之间没有 null slot 间隔
+                //
+                //  staleSlot
+                //     h     h+1   h+2   h+3   h+4    h+5   h+6   h+7   h+8   h+9
+                //    [A1]  [A2]  [A3]  [A4]  [A5]    [B1]  [B2]  [B3]  [B4]  [B5]
+                //                                                                     步骤1：清理
+                //  [null]  [A2]  [A3]  [A4]  [A5]    [B1]  [B2]  [B3]  [B4]  [B5]
+                //         /     /     /    /          |     |     |     |     |       步骤2：Rehash
+                //    [A2]  [A3]  [A4]  [A5]  [null]  [B1]  [B2]  [B3]  [B4]  [B5]
+                //
+                //  CASE 2 中，清理从 h 一直到 h+9 结束，除了 A2-A5 需要移动，B1-B5 虽然被处理了，但本质上
+                //  没有改变位置，所以的确是由两次无效的引用操作！
+                // --------------------------------
+                //
+                tab[h] = e;
+            }
+        }
+    }
+    // 返回staleSlot之后第一个 null slot 索引
+    return i;
+}
+```
+expungeStaleEntry 方法有人称之为“连续段清理”，比较贴切，它从 staleSlot 索引开始遍历直到出现一个 null slot ，这的确是一个没有 null slot 的连续段， 将这一段索引中所有 stale entry 清空，并将所有 full entry rehash 重新从它的 hashcode 进行线性探查 set 到新位置（当然如果参与 rehash 的当前 entry 对应的所有元素都是 full entry ，则这些 entry 还是会放回原来的位置）。
+
+
+
 
 
 ## 内存泄漏问题
