@@ -299,7 +299,7 @@ private static int nextHashCode() {
     return nextHashCode.getAndAdd(HASH_INCREMENT);
 }
 ```
-可以看到 ThreadLocal 中的 threadLocalHashCode 是 final 类型的，ThreadLocal 对象在创建的时候就会自动生成，由 nextHashCode 当前值加上 HASH_INCREMENT 得到。这里又有一个疑问，为什么 HASH_INCREMENT 不是别的什么数，偏偏是 0x61c88647 呢？参考文献[5]中有有具体说明其观点，里面讲了一大堆与黄金分割和斐波那契 hash 有关的东西，加上有些人通过做实验，反正最后结果就是对于长度为 2 次幂的 table 采用 0x61c88647 这个数字参与为每个存入 ThreadLocalMap 的对象进行 hash 时得到的结果非常均匀。
+可以看到 ThreadLocal 中的 threadLocalHashCode 是 final 类型的，ThreadLocal 对象在创建的时候就会自动生成，由 nextHashCode 当前值加上 HASH_INCREMENT 得到。这里又有一个疑问，为什么 HASH_INCREMENT 不是别的什么数，偏偏是 0x61c88647 呢？参考文献[5]中有有具体说明其观点，里面讲了一大堆与黄金分割和斐波那契 hash 有关的东西，加上有些人通过做实验，反正最后结果就是对于长度为 2 次幂的 table 采用 0x61c88647 这个数字参与为每个存入 ThreadLocalMap 的对象进行 hash 时得到的结果非常均匀，这有利于减少散列冲突。
 
 对于 & (INITIAL_CAPACITY - 1) 操作，它是对 INITIAL_CAPACITY 取模的位运算算法，由于是位运算比直接 % 取模运算效率高。
 
