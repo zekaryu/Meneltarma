@@ -81,6 +81,86 @@ Root Tracing 算法根据以下两个原则标记对象的可达性：
 
 如上图所示，对对象4存在3条引用路径：(1)(6),(2)(5),(3)(4)。那么从根对象到对象4的最强引用时(2)(5)，因为(2)和(5)都是强引用。如果对象4仅存在一条(1)(6)引用，那么对它的引用就是最弱的引用为准，也就是 SoftReference ，对象4就是 softly-reachable 对象。
 
+# 不同类型 reference java 代码举例
+
+```java
+package com.example.reference;
+import java.lang.ref.PhantomReference;
+import java.lang.ref.ReferenceQueue;
+import java.lang.ref.SoftReference;
+import java.lang.ref.WeakReference;
+public class ReferenceExample {
+       private String status ="Hi I am active";
+       public String getStatus() {
+              return status;
+       }
+       public void setStatus(String status) {
+              this.status = status;
+       }
+       @Override
+       public String toString() {
+              return "ReferenceExample [status=" + status + "]";
+       }
+       public void strongReference()
+       {
+              ReferenceExample ex = new ReferenceExample();
+              System.out.println(ex);
+       }
+       public void softReference()
+       {
+              SoftReference<ReferenceExample> ex = new SoftReference<ReferenceExample>(getRefrence());
+              System.out.println("Soft refrence :: " + ex.get());
+       }
+       public void weakReference()
+       {
+              int counter=0;
+              WeakReference<ReferenceExample> ex = new WeakReference<ReferenceExample>(getRefrence());
+              while(ex.get()!=null)
+              {
+                     counter++;
+                     System.gc();
+                     System.out.println("Weak reference deleted  after:: " + counter + ex.get());
+              }
+       }
+       public void phantomReference() throws InterruptedException
+       {
+              final ReferenceQueue queue = new ReferenceQueue();
+              PhantomReference<ReferenceExample> ex = new PhantomReference<ReferenceExample>(getRefrence(),queue);
+              System.gc();
+              queue.remove();
+              System.out.println("Phantom reference deleted  after");
+       }
+       private ReferenceExample getRefrence()
+       {
+              return new ReferenceExample();
+       }
+       public static void main(String[] args) {
+              ReferenceExample ex = new ReferenceExample();
+              ex.strongReference();
+              ex.softReference();
+              ex.weakReference();
+              try {
+                     ex.phantomReference();
+              } catch (InterruptedException e) {
+                     // TODO Auto-generated catch block
+                     e.printStackTrace();
+              }
+       }
+}
+Output :
+ReferenceExample [status=Hi I am active]
+Soft refrence :: ReferenceExample [status=Hi I am active]
+Weak reference deleted  after:: 1null
+Phantom reference deleted  after
+```
+
+
 # 总结
 
 通过对以上各类型的 reference 介绍可以发现其实 reference 主要是用来与虚拟机 gc 进行交互，使得虚拟机根据对象的不同引用类型，对其采用不同的内存回收策略。strong 引用的对象正常情况下不会被回收，soft 引用的对象会在出现 OOM 错误之前被回收，而 weak 引用的对象在下一次 gc 的时候就会被回收，对 reference 的基本理解就差不多了。至于 PhantomReference 与 FinalReference 下次再讲。
+
+
+## 参考文献
+
+* [java学习教程之Reference详解](http://www.androidstar.cn/java%E5%AD%A6%E4%B9%A0%E6%95%99%E7%A8%8B%E4%B9%8Breference%E8%AF%A6%E8%A7%A3/)
+* [Different Types of References in Java](https://dzone.com/articles/java-different-types-of-references)
