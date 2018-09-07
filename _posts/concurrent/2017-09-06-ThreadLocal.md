@@ -545,8 +545,130 @@ private int expungeStaleEntry(int staleSlot) {
 ```
 expungeStaleEntry 方法有人称之为“连续段清理”，比较贴切，它从 staleSlot 索引开始遍历直到出现一个 null slot ，这的确是一个没有 null slot 的连续段， 将这一段索引中所有 stale entry 清空，并将所有 full entry rehash 重新从它的 hashcode 进行线性探查 set 到新位置（当然如果参与 rehash 的当前 entry 对应的所有元素都是 full entry ，则这些 entry 还是会放回原来的位置）。
 
+下面接着看 cleanSomeSlots：
+```java
+/**
+ * 采用探索方式寻找 stale entry。当有新元素加入或者 stale entry 被清理时
+ * 被调用。会进行 log(n) 次扫描，之所以选择扫描这么多次是因为，如果不进行
+ * 扫描（虽然速度很快，但是处理得不干净，很可能有垃圾遗留），如果扫描固定比
+ * 例的元素会清理所有垃圾，但是会有一些插入操作，最坏情况时间复杂度会达到 O(n)。
+ * 参数 n 可根据实际情况进行调节，目前这个版本效果很不错，既简单又快速。
+ * @param i a position known NOT to hold a stale entry. The
+ * scan starts at the element after i.
+ *
+ * @param n scan control: {@code log2(n)} cells are scanned,
+ * unless a stale entry is found, in which case
+ * {@code log2(table.length)-1} additional cells are scanned.
+ * When called from insertions, this parameter is the number
+ * of elements, but when from replaceStaleEntry, it is the
+ * table length. (Note: all this could be changed to be either
+ * more or less aggressive by weighting n instead of just
+ * using straight log n. But this version is simple, fast, and
+ * seems to work well.)
+ *
+ * @return true if any stale entries have been removed.
+ */
+private boolean cleanSomeSlots(int i, int n) {
+    boolean removed = false;
+    Entry[] tab = table;
+    int len = tab.length;
+    // 从索引 i 开始，循环 log(n) 次线性探测，每次遇到 stale entry 就
+    // 调用 expungeStaleEntry 方法进行清理
+    do {
+        // 获取下一个索引
+        i = nextIndex(i, len);
+        Entry e = tab[i];
+        // 如果是 stale entry
+        if (e != null && e.get() == null) {
+            // 多扫描 log2(table.length)-1 次
+            n = len;
+            // 只要有 entry 被清除，removed 便为 true
+            removed = true;
+            // 调用 expungeStaleEntry ，从 i 开始进行连续段清除
+            i = expungeStaleEntry(i);
+        }
+    } while ( (n >>>= 1) != 0);
+    // 返回是否有 entry 被清除
+    return removed;
+}
+```
+cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择了一个从某索引开始的扫描次数进行全局清理。
 
+然后再看一下最后一个与 set 有关的方法 replaceStaleEntry：
+```java
+/**
+ * Replace a stale entry encountered during a set operation
+ * with an entry for the specified key.  The value passed in
+ * the value parameter is stored in the entry, whether or not
+ * an entry already exists for the specified key.
+ *
+ * As a side effect, this method expunges all stale entries in the
+ * "run" containing the stale entry.  (A run is a sequence of entries
+ * between two null slots.)
+ *
+ * @param  key the key
+ * @param  value the value to be associated with key
+ * @param  staleSlot index of the first stale entry encountered while
+ *         searching for key.
+ */
+private void replaceStaleEntry(ThreadLocal<?> key, Object value,
+                               int staleSlot) {
+    Entry[] tab = table;
+    int len = tab.length;
+    Entry e;
 
+    // Back up to check for prior stale entry in current run.
+    // We clean out whole runs at a time to avoid continual
+    // incremental rehashing due to garbage collector freeing
+    // up refs in bunches (i.e., whenever the collector runs).
+    int slotToExpunge = staleSlot;
+    for (int i = prevIndex(staleSlot, len);
+         (e = tab[i]) != null;
+         i = prevIndex(i, len))
+        if (e.get() == null)
+            slotToExpunge = i;
+
+    // Find either the key or trailing null slot of run, whichever
+    // occurs first
+    for (int i = nextIndex(staleSlot, len);
+         (e = tab[i]) != null;
+         i = nextIndex(i, len)) {
+        ThreadLocal<?> k = e.get();
+
+        // If we find key, then we need to swap it
+        // with the stale entry to maintain hash table order.
+        // The newly stale slot, or any other stale slot
+        // encountered above it, can then be sent to expungeStaleEntry
+        // to remove or rehash all of the other entries in run.
+        if (k == key) {
+            e.value = value;
+
+            tab[i] = tab[staleSlot];
+            tab[staleSlot] = e;
+
+            // Start expunge at preceding stale entry if it exists
+            if (slotToExpunge == staleSlot)
+                slotToExpunge = i;
+            cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
+            return;
+        }
+
+        // If we didn't find stale entry on backward scan, the
+        // first stale entry seen while scanning for key is the
+        // first still present in the run.
+        if (k == null && slotToExpunge == staleSlot)
+            slotToExpunge = i;
+    }
+
+    // If key not found, put new entry in stale slot
+    tab[staleSlot].value = null;
+    tab[staleSlot] = new Entry(key, value);
+
+    // If there are any other stale entries in run, expunge them
+    if (slotToExpunge != staleSlot)
+        cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
+}
+```
 
 
 ## 内存泄漏问题
