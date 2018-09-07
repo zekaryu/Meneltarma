@@ -483,7 +483,7 @@ private int expungeStaleEntry(int staleSlot) {
                 // 的 entry 之间才有可能出现 null slot ，其他临时状态只要相同的 hashcode 的 entry 之
                 // 间出现  stale entry 马上就会被清理，然后被其他 rehash 之后的 entry 填满
 
-                // 从原始 h 索引开始寻找一个下一个可以放置当前 entry 的位置不断更新的 h
+                // 从原始 h 索引开始寻找下一个可以放置当前 entry 的索引
                 while (tab[h] != null)
                     h = nextIndex(h, len);
                 // 找到之后将 e 赋值给 tab[h]
