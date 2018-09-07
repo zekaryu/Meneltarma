@@ -150,6 +150,7 @@ public void set(T value) {
 在看源码之前有一点要注意， ThreadLocalMap 作为成员变量出现在 Thread 类中，说明每个线程都拥有一个独立的 ThreadLocalMap 实例，这符合 ThreadLocal 存储的数据线程隔离的特点下面可以一步一步开始解析源码。
 
 ![threadlocalmap结构](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocalmap-hierarchy.png)
+<center>图1 threadlocalmap结构图</center>
 
 看到 Entry 很容易让人想到 java.util.Map 的各种实现类中的 Entry，不过这里的 ThreadLocalMap 与 HashMap 等实现方式不同，ThreadLocalMap 并没有借助 java.util.Map 接口来实现，而是自己实现了一套 map 操作的逻辑。Entry 类中将 ThreadLocal 作为 key，value 为实际要存储的值，不过查看代码可以发现 Entry 继承了 WeakReference ，且在构造方法中对 key 调用了 super(k) ，所以其实 key 并不是 ThreadLocal 对象本身，而是 ThreadLocal 的 WeakReference ，至于为什么我们暂且按下不表，下文接着讨论。
 ```java
@@ -308,6 +309,7 @@ private static int nextHashCode() {
 #### Entry 状态
 
 ![threadlocalmap结构2](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocalmap-model2.png)
+<center>threadlocalmap结构图</center>
 
 图中名词解释：
 1. slot ：table 表中某个索引对应的位置（存放一个 entry）；
@@ -360,6 +362,8 @@ private Entry getEntryAfterMiss(ThreadLocal<?> key, int i, Entry e) {
     return null;
 }
 ```
+get 过程首先使用快速类似乐观锁的方法尝试命中 entry 以提高效率，如果没有命中，则以线性探测的方式寻找，找到同一个 key 则返回对应 entry ， 未找到则返回 null ，并且在寻找的同时，顺便调用 expungeStaleEntry 方法清理过期的 stale entry。
+
 #### set
 ```java
 /**
