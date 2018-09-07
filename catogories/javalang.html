@@ -1,14 +1,13 @@
 ---
 layout: category
-title: 并发
-page_tagline: 并发相关
+title: java.lang包
 ---
 
 <div>
-  <h2 id="title">并发</h2>
+  <h2 id="title">java的lang包</h2>
   <ul class="post-list">
     {% for post in site.posts %}
-     {% if post.categories[0] == "concurrent" %}
+     {% if post.categories[0] == "javalang" %}
       <li>
         {% assign date_format = site.cayman-blog.date_format | default: "%b %-d, %Y" %}
         <span class="post-meta">{{ post.date | date: date_format }}</span>
@@ -25,7 +24,7 @@ page_tagline: 并发相关
 <script type="text/javascript" charset="utf-8">
   var count=0;
   {% for post in site.posts %}
-   {% if post.categories[0] == "concurrent" %}
+   {% if post.categories[0] == "javalang" %}
      count++;
    {% endif %}
   {% endfor %}
