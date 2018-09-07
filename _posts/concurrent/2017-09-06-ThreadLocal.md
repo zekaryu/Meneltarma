@@ -597,14 +597,11 @@ cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择了�
 然后再看一下最后一个与 set 有关的方法 replaceStaleEntry：
 ```java
 /**
- * Replace a stale entry encountered during a set operation
- * with an entry for the specified key.  The value passed in
- * the value parameter is stored in the entry, whether or not
- * an entry already exists for the specified key.
+ * 在 set 操作的过程中对给定的 key 将原来的 stale entry 替换为新的 full entry 。
+ * 不管如如惨中的 key 对应的 entry 原本是否存在，都会将新的 value 存入新的 full entry 中。
  *
- * As a side effect, this method expunges all stale entries in the
- * "run" containing the stale entry.  (A run is a sequence of entries
- * between two null slots.)
+ * 这个方法的副作用是，它会将这个 “run” 中所有的过期 stale entry 都清除。（run 表示两个连
+ * 续 null slot 之间的所有元素包括 full entry 和 stale entry）
  *
  * @param  key the key
  * @param  value the value to be associated with key
