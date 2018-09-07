@@ -177,7 +177,7 @@ private static final int INITIAL_CAPACITY = 16;
 private Entry[] table;
 
 /**
- * table 表的长度
+ * table 表的元素的个数
  */
 private int size = 0;
 
@@ -189,7 +189,7 @@ private int threshold;
 以上定义了一些与存储具体 Entry 的 table 相关的变量，Entry 以数组形式存放于 table 表中，table 表的长度必须是2的幂，table 扩容的阈值 threshold。有个问题为什么 table 的长度必须是2的幂？？？ 接着看：
 ```java
 /**
- * 设置扩容需要维持的负载因子不能超过原来长度的2/3
+ * 设置扩容需要维持的负载因子不能超过原来表长度的2/3
  */
 private void setThreshold(int len) {
     threshold = len * 2 / 3;
@@ -276,7 +276,7 @@ ThreadLocalMap(ThreadLocal<?> firstKey, Object firstValue) {
     int i = firstKey.threadLocalHashCode & (INITIAL_CAPACITY - 1);
     // 新建对应 Entry 对象，并放入 table 的第 i 个位置
     table[i] = new Entry(firstKey, firstValue);
-    // 设置 table 长度为 1
+    // 设置 table 元素个数为 1
     size = 1;
     // 设置扩容阈值
     setThreshold(INITIAL_CAPACITY);
@@ -378,45 +378,47 @@ private void set(ThreadLocal<?> key, Object value) {
     // set() 中并没有像 get() 一样一上来就尝试直接命中 Entry 的快速路径
     // 因为在 set() 中直接替代原有的老 Entry 与直接 new 新的 Entry
     // 出现的频率至少是一样多的，在这种情况下，采用快速路径反而失败比成功
-    // 更频繁，并没有为什么优势
+    // 更频繁，并没有什么优势
     Entry[] tab = table;
     int len = tab.length;
     // 计算需要 set 的 key 的 hashcode 作为索引
     int i = key.threadLocalHashCode & (len-1);
 
-
+    // 线性探测不为 null 的 entry，步长为 1
     for (Entry e = tab[i];
          e != null;
          e = tab[i = nextIndex(i, len)]) {
+        // 获取 entry 的 key
         ThreadLocal<?> k = e.get();
-
+        // 如果探测到同一个 key，这是一个 full entry
         if (k == key) {
+            // 则将新的 value 赋值给 entry
             e.value = value;
             return;
         }
-
+        // 如果 key 为 null ，说明这是一个 stale entry 需要被清理或者被代替
         if (k == null) {
+            // 用新的值替换原来的 stale entry
             replaceStaleEntry(key, value, i);
             return;
         }
     }
-
+    // 如果线性探测到 null slot，则直接新建一个 entry，放入这个 slot 中
     tab[i] = new Entry(key, value);
+    // 表中元素个数增加
     int sz = ++size;
+    //元素如果增加需要检测是否需要 rehash() 可能需要扩容
+    // cleanSomeSlots 返回是否有节点被清楚，所以 rehash() 成立的需要同时满足两个条件：
+    // 1. table 中有没节点删除；2. 元素个数超过阈值
     if (!cleanSomeSlots(i, sz) && sz >= threshold)
         rehash();
 }
 ```
 
-### 成员变量
 
+## 内存泄漏问题
 
-
-
-## 注意事项  ThreadLocal 与 ExecutorService 配合使用
-
-
-
+TODO
 
 ## 参考文献
 
