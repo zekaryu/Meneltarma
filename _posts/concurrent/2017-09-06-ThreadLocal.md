@@ -822,7 +822,7 @@ private void remove(ThreadLocal<?> key) {
 
 现在来看几种情况：
 1. Threadlocal 对象被会收时，map 中的 key 由于是 WeakReference 也会在下次 gc 被回收，但 entry 的 value 此时并不会被回收，如果 map 不再做任何操作，则导致内存泄漏，因为此时程序已经获取不到这个 value ，大家的分歧就在这里，认为 Threadlocal 会导致内存泄漏的人的观点是 value 此时获取不到，所以内存泄漏。而认为不会有内存泄漏的人观点是，针对这种情况 ThreadLocal 的设计者们的解决办法是，在 set ，get ， remove 的时候调用 expungeStaleEntry 连续段清理对这些 stale entry 进行清理以避免内存泄漏。但这其中有个问题，连续段清理不代表全表清理，全表清理的触发不是百分之百的，需要达到一定的阈值条件；倘若某个大对象 threadlocal 置为 null 之后，线程长期存在，且未再调用任何 set ，get ， remove 方法，则此对象作为 value 就一直不会被释放。了。ThreadLocalMap 的类注释中也写到，只有在 table 的空间快用完时，他才保证一定清理 stale entry ，这个保证是通过 rehash 完成的。所以我个人的结论是，只要不是百分之百的保证，就应该说它是有泄漏内存的风险，无论他最终是否由于调用 set，get，remove 而清除了 stale entry 或者更进一步，触发了全表清除。
-2. 在第一种情况下，加入出现了内存泄漏，只要没有使用线程池，线程不会被复用，运行完成后销毁，那么由于 ThreadLocalMap 是 Thread 类的成员，线程销毁 map 自然也会销毁，所以最终不会出现内存溢出。不过假如我们采用了线程池，某些核心线程的生命周期与整个应用绑定在一起，那么很有可能只有在整个应用 shutdown 的情况下，才能消除这种内存泄漏。
+2. 在第一种情况下，假如出现了内存泄漏，只要没有使用线程池，线程不会被复用，运行完成后销毁，那么由于 ThreadLocalMap 是 Thread 类的成员，线程销毁 map 自然也会销毁，所以最终不会出现内存溢出。不过假如我们采用了线程池，某些核心线程的生命周期与整个应用绑定在一起，那么很有可能只有在整个应用 shutdown 的情况下，才能消除这种内存泄漏。
 
 所以在使用 ThreadLocal 的时候，强烈建议，在线程利用完当前任务 ThreadLocal 对象完成本次任务之前，调用 remove 方法显式删除 entry ， 这样就能百分之百避免内存泄漏的发生。如果没有显式调用 remove 方法，只能说大概率能保证不会出现内存泄漏，在即便这个概率达到 99.99999....% 也只能说大概率，而不是百分之百。
 
@@ -834,6 +834,8 @@ private void remove(ThreadLocal<?> key) {
 
 
 # 参考文献
+
+在学习过程中，查阅了大量网络上的各位的文章和文献，其中有些文章地址一时找不到了，在此将能找到的参考文献列出，供参考：
 
 1. [An Introduction to ThreadLocal in Java](https://www.baeldung.com/java-threadlocal)
 2. [Java ThreadLocal](http://tutorials.jenkov.com/java-concurrency/threadlocal.html)
