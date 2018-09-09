@@ -830,7 +830,7 @@ private void remove(ThreadLocal<?> key) {
 
 # 总结
 
-本文主要对 ThreadLocal 类以源码顺序为逻辑进行了解析，首先通过引入一个线程需要保存自己的变量的问题提出 ThreadLocal 类的必要性，阅读源码过程中发现实际上 ThreadLocalMap 才是 ThreadLocal 核心类，接着对 ThreadLocalMap 的存储结构，谁家思想结合代码进行了层层分析。过程中学习到了两位作者各种精妙的算法设计和高效的代码逻辑，包括对 WeakReference 的使用，为什么 tab 表的长度是 2 次幂，探索式算法等等，本人阅读之后除了对 ThreadLocal 的源代码融汇贯通之外对于平时自己的工作过程中应该如何思考问题设计算法也受益良多。
+本文主要对 ThreadLocal 类以源码顺序为逻辑进行了解析，首先通过引入一个线程需要保存自己的变量的问题提出 ThreadLocal 类的必要性，阅读源码过程中发现实际上 ThreadLocalMap 才是 ThreadLocal 核心类，接着对 ThreadLocalMap 的存储结构，谁家思想结合代码进行了层层分析。过程中学习到了两位作者各种精妙的算法设计和高效的代码逻辑，包括对 WeakReference 的使用，为什么 tab 表的长度是 2 次幂，探索式算法，线性探测，数组的环形处理等等，本人阅读之后除了对 ThreadLocal 的源代码融汇贯通之外对于平时自己的工作过程中应该如何思考问题设计算法也受益良多。
 
 
 # 参考文献
