@@ -407,7 +407,7 @@ private void set(ThreadLocal<?> key, Object value) {
             return;
         }
     }
-    // 如果线性探测到 null slot，则直接新建一个 entry，放入这个 slot 中
+    // 如果线性首先探测到 null slot，则直接新建一个 entry，放入这个 slot 中
     tab[i] = new Entry(key, value);
     // 表中元素个数增加
     int sz = ++size;
@@ -543,7 +543,7 @@ private int expungeStaleEntry(int staleSlot) {
     return i;
 }
 ```
-expungeStaleEntry 方法有人称之为“连续段清理”，比较贴切，它从 staleSlot 索引开始遍历直到出现一个 null slot ，这的确是一个没有 null slot 的连续段， 将这一段索引中所有 stale entry 清空，并将所有 full entry rehash 重新从它的 hashcode 进行线性探查 set 到新位置（当然如果参与 rehash 的当前 entry 对应的所有元素都是 full entry ，则这些 entry 还是会放回原来的位置）。
+expungeStaleEntry 方法有人称之为“连续段清理”，比较贴切，它从 staleSlot 索引开始遍历直到出现一个 null slot ，这的确是一个没有 null slot 的连续段， 将这一段索引中所有 stale entry 清空，并将所有 full entry rehash 重新从它的 hashcode 进行线性探测 set 到新位置（当然如果参与 rehash 的当前 entry 对应的所有元素都是 full entry ，则这些 entry 还是会放回原来的位置）。
 
 下面接着看 cleanSomeSlots：
 ```java
@@ -598,7 +598,7 @@ cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择从�
 ```java
 /**
  * 在 set 操作的过程中对给定的 key 将原来的 stale entry 替换为新的 full entry 。
- * 不管如如惨中的 key 对应的 entry 原本是否存在，都会将新的 value 存入新的 full entry 中。
+ * 不管入参中的 key 对应的 entry 原本是否存在，都会将新的 value 存入新的 full entry 中。
  *
  * 这个方法的副作用是，它会将这个 “run” 中所有的过期 stale entry 都清除。（run 表示两个连
  * 续 null slot 之间的所有元素包括 full entry 和 stale entry）
@@ -618,18 +618,27 @@ private void replaceStaleEntry(ThreadLocal<?> key, Object value,
     // We clean out whole runs at a time to avoid continual
     // incremental rehashing due to garbage collector freeing
     // up refs in bunches (i.e., whenever the collector runs).
+    // 索引反向遍历来检查当前 run 中在 staleSlot 之前的 stale entry。
+    // 这里会一次性清理整个 run ， 这么做是为了避免由于垃圾回收释放成群
+    // 的 key 可能导致增量 rehash 的频繁发生
+    // 当前清理其实位置 slotToExpunge = staleSlot
     int slotToExpunge = staleSlot;
+    // 从 staleSlot 反向探测
     for (int i = prevIndex(staleSlot, len);
          (e = tab[i]) != null;
          i = prevIndex(i, len))
+        // 如果 e 为 stale entry （也就是 key 为 null ）
         if (e.get() == null)
+            // 则更新清理开始的位置为 i
             slotToExpunge = i;
 
     // Find either the key or trailing null slot of run, whichever
     // occurs first
+    // 正向遍历，直到找到 key 或者这个 run 尾部的 null slot
     for (int i = nextIndex(staleSlot, len);
          (e = tab[i]) != null;
          i = nextIndex(i, len)) {
+        // 获取当前位置 entry 的 k
         ThreadLocal<?> k = e.get();
 
         // If we find key, then we need to swap it
@@ -637,15 +646,29 @@ private void replaceStaleEntry(ThreadLocal<?> key, Object value,
         // The newly stale slot, or any other stale slot
         // encountered above it, can then be sent to expungeStaleEntry
         // to remove or rehash all of the other entries in run.
+        // 如果找到 key ，则首先更新 entry 的 value 然后将当前 entry 与
+        // stale entry 交换来保持 table 排序。实质就是将过期的 entry 都
+        // 往后排，方便清理
+        // 之后从这个 run 中清理位置 slotToExpunge 开始进行一次连续段清理
+        // 和探索式清理
         if (k == key) {
+            // 如果找到 key ，首先更新 entry 的新值 value
             e.value = value;
 
+            // 交换当前 entry 和 stale entry
+            // 将 stale entry set 到 tab[i]
             tab[i] = tab[staleSlot];
+            // 将当前 entry e set 到 staleSlot 位置
             tab[staleSlot] = e;
 
             // Start expunge at preceding stale entry if it exists
+            // 如果 slotToExpunge == staleSlot，也就是说这个 run 中
+            // 从第一个非 null slot 开始一直到 i 都没有 stale slot
             if (slotToExpunge == staleSlot)
+                // 则从索引 i 开始清理（因为当前 entry 与 stale entry 交换过
+                // ，所以 i 位置的 stale entry 是这个 run 中第一个需要清理的位置）
                 slotToExpunge = i;
+            // 确定 run 清理开始我位置之后，调用一次连续段清理和探索式清理
             cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
             return;
         }
@@ -653,26 +676,164 @@ private void replaceStaleEntry(ThreadLocal<?> key, Object value,
         // If we didn't find stale entry on backward scan, the
         // first stale entry seen while scanning for key is the
         // first still present in the run.
+        // 如果反向搜索没有找的需要清理的 stale entry(也就是 slotToExpunge 没有改变
+        // 还是等于 staleSlot)，则在正向探测过程中遇到的第一个 stale entry 就是这个
+        // run 中的第一个 stale entry，也是清理开始的索引: 当前 i
         if (k == null && slotToExpunge == staleSlot)
             slotToExpunge = i;
     }
 
     // If key not found, put new entry in stale slot
+    // 如果在正向探测过程中没有找到 key，就新建一个 entry 放入 stale slot
+    // 首先将 stale entry 的 value 置为 null，帮助 gc 回收
     tab[staleSlot].value = null;
+    // 创建一个新的 entry 放入 stale slot
     tab[staleSlot] = new Entry(key, value);
 
     // If there are any other stale entries in run, expunge them
+    // 如果方法中两个方向的探测至少一个 stale entry ，则 slotToExpunge 一定会更新为
+    // run 中第一个  stale entry 的位置，那么就调用一次连续段清理和探索式清理；
     if (slotToExpunge != staleSlot)
         cleanSomeSlots(expungeStaleEntry(slotToExpunge), len);
+    // 如果整个过程中没有任何 stale entry ，也就是 slotToExpunge == staleSlot ，而
+    // 此时 staleSlot 位置已经被赋予新的 full entry ，所以整个 run 中没有  stale entry
+    // 不需要清理
 }
 ```
+replaceStaleEntry 方法做了两件事情：
+1.从 staleSlot 开始线性探测如果 tab 的其他位置原本就存在 key 对应的 entry ， 则首先更新 entry ，再将这个 entry 与需要替换的 staleSlot 位置的 stle entry 交换位置；如果探测直到出现第一个 null slot 都没有找到对应的 key ，那么就直接创建一个新的 entry set 到 staleSlot 位置。这一步真正完成了 replace 操作。
+2.与此同时顺便进行一波 stale entry 的清除：以 staleSlot 位置为参照点，进行两个方向的线性探测，确定 staleSlot 所处的 run 中的第一个 stale entry 所在的位置（staleSlot 位置除外，因为无论如何它被 replace 之后都是有效的 full slot），假如 run 中没有其他 stale entry 则算法结束，否则先进行一次连续段清除，再进行一次探索式（Heuristical）清除。
+
+由于 set 操作之后可能涉及到 tab 元素的增加，如果元素个数超过阈值需要调用  rehash ：
+```java
+/**
+ * Re-pack and/or re-size the table. First scan the entire
+ * table removing stale entries. If this doesn't sufficiently
+ * shrink the size of the table, double the table size.
+ *
+ * table 表所有元素重新执行散列过程。首先扫描全表，调用 expungeStaleEntries()
+ * 删除表中所有 stale entry，如果此操作之后没有将 tab 表元素个数缩减到一定范围
+ * 内，则调用 resize() 进行扩容.
+ */
+private void rehash() {
+    expungeStaleEntries();
+
+    // Use lower threshold for doubling to avoid hysteresis
+    // 使用更低的扩容阈值 3/4 threshold = 1/2 length，目的是避免滞后（不是很理解什么意思？？）
+    if (size >= threshold - threshold / 4)
+        resize();
+}
+
+/**
+ * Expunge all stale entries in the table.
+ * 遍历整个 tab ，清理 tab 中所有 stale entry
+ */
+private void expungeStaleEntries() {
+    Entry[] tab = table;
+    int len = tab.length;
+    for (int j = 0; j < len; j++) {
+        Entry e = tab[j];
+        if (e != null && e.get() == null)
+            expungeStaleEntry(j);
+    }
+}
+
+/**
+ * Double the capacity of the table.
+ * 将 tab 表的长度加倍（注意原来 table 长度是 2 次幂，double 之后还是 2 次幂）
+ */
+private void resize() {
+    Entry[] oldTab = table;
+    // 原来的长度
+    int oldLen = oldTab.length;
+    // 新的长度
+    int newLen = oldLen * 2;
+    // 创建新的 tab 表
+    Entry[] newTab = new Entry[newLen];
+    int count = 0;
+
+    // 遍历老表
+    for (int j = 0; j < oldLen; ++j) {
+        Entry e = oldTab[j];
+        // 如果不是 null slot
+        if (e != null) {
+            ThreadLocal<?> k = e.get();
+            // 且是 stale slot
+            if (k == null) {
+                // 将 entry 的 value 也置为 null ，
+                // 帮助 gc 回收
+                e.value = null; // Help the GC
+            } else {
+            // 如果是 full slot ，就在新表中进行线性探测将 entry 转移到新表
+                int h = k.threadLocalHashCode & (newLen - 1);
+                while (newTab[h] != null)
+                    h = nextIndex(h, newLen);
+                newTab[h] = e;
+                // 新表中 full entry 的数量
+                count++;
+            }
+        }
+    }
+    // 设置新表的阈值
+    setThreshold(newLen);
+    // 设置新表的元素数量
+    size = count;
+    // 新表替换旧表
+    table = newTab;
+}
+```
+至此，set 涉及到的所有操作都已经捋了一遍，描述一下：
+1. 首先计算 key 对应的 hashcode h ，从 h 开始线性探测，如果在第一次遇到 stale slot 或 null slot 之前找到 key 对应的 full entry ，则直接 set value；
+2. 如果 h 开始的线性探测过程中，在第一次遇到 null slot 之前发现 stale entry，则调用 replaceStaleEntry：
+   - 1.1 从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前找到 key 对应的 full entry ，那么先更新 full entry 的 value ，然后将 stale entry 与 full entry 交换；
+   - 1.2 从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前未找到 key ，则在 stale slot 位置直接创建一个 key 对应的新的 full entry ；
+   步骤2结束钱都会对 stale slot 所在 run 做一次连续段清理和探索式清理。
+3. 如果 h 开始的线性探测过程中，在第一次遇到 null slot 之前没有探测到 stale entry ，且没有探测到 key 对应的 full entry ， 则在这些连续 full entry 之后紧跟的 null slot 位置直接创建一个 key 对应的新的 full entry。
+4. set entry 的操作完成以后，如果发现 tab 的元素没有减少即没有 stale entry 被清理，且 tab 元素个数 size 超过阈值即 tab 的长度 length 的2/3，则调用一次 rehash() ，rehash() 会针对 tab 的每个索引做一次连续段清理，清理之后如果 tab 的元素个数 size 超过 3/4 阈值即 tab 长度的一半，则 tab 扩容为原来的两倍。
+
+最后还剩下 remove 方法：
+```java
+/**
+ * Remove the entry for key.
+ * 删除 tab 中 key 对应的 entry
+ */
+private void remove(ThreadLocal<?> key) {
+    Entry[] tab = table;
+    int len = tab.length;
+    int i = key.threadLocalHashCode & (len-1);
+    for (Entry e = tab[i];
+         e != null;
+         e = tab[i = nextIndex(i, len)]) {
+        if (e.get() == key) {
+            // ThreadLocalMap.Entry 的 clear 方法继承自 Reference ，clear 之后
+            // entry.key 对 threadlocalObj 的 WeakReference 会断开，使得 entry
+            // 成为 stale entry ， 所以需要调用 expungeStaleEntry 进行清理
+            e.clear();
+            expungeStaleEntry(i);
+            return;
+        }
+    }
+}
+```
+按常理如前文解释过的， threadlocalObj 在置为 null 的时候，会自动通知虚拟机它仅剩一个从 entry 指向它的引用，需要在下次 gc 被回收。但在实际应用中还是会出现在某些特殊情况下，程序中 threadlocalObj 没有被置为 null ，导致 entry 没有被回收（所谓的内存泄漏），为了防止这种情况的发生，所以提供了 remove 方法，显式将 WeakReference 断开，帮助 gc 回收，可以说 remove 方法是一个清理 threadlocalmap 的显式保险机制。那么究竟哪些情况会出现这里所说的 threadlocalObj 未被置为 null 呢？接着看！
+
+### 内存泄漏问题
+关于 Threadlocal 是否会有内存泄漏的风险，有各种不同的说法，不过既然说到内存泄漏，首先就要定义好什么叫“内存泄漏”，摘录一段wiki中的定义：在计算机科学中，当一个计算机程序由于不正确的内存分配导致的资源泄漏叫内存泄漏。当存储在内存中的对象不能被运行的代码访问时就发生了内存泄漏。内存泄漏与其他一系列问题的症状类似，一般情况下只能由程序员通过进入源代码查看才能诊断。
+
+现在来看几种情况：
+1. Threadlocal 对象被会收时，map 中的 key 由于是 WeakReference 也会在下次 gc 被回收，但 entry 的 value 此时并不会被回收，如果 map 不再做任何操作，则导致内存泄漏，因为此时程序已经获取不到这个 value ，大家的分歧就在这里，认为 Threadlocal 会导致内存泄漏的人的观点是 value 此时获取不到，所以内存泄漏。而认为不会有内存泄漏的人观点是，针对这种情况 ThreadLocal 的设计者们的解决办法是，在 set ，get ， remove 的时候调用 expungeStaleEntry 连续段清理对这些 stale entry 进行清理以避免内存泄漏。但这其中有个问题，连续段清理不代表全表清理，全表清理的触发不是百分之百的，需要达到一定的阈值条件；倘若某个大对象 threadlocal 置为 null 之后，线程长期存在，且未再调用任何 set ，get ， remove 方法，则此对象作为 value 就一直不会被释放。了。ThreadLocalMap 的类注释中也写到，只有在 table 的空间快用完时，他才保证一定清理 stale entry ，这个保证是通过 rehash 完成的。所以我个人的结论是，只要不是百分之百的保证，就应该说它是有泄漏内存的风险，无论他最终是否由于调用 set，get，remove 而清除了 stale entry 或者更进一步，触发了全表清除。
+2. 在第一种情况下，加入出现了内存泄漏，只要没有使用线程池，线程不会被复用，运行完成后销毁，那么由于 ThreadLocalMap 是 Thread 类的成员，线程销毁 map 自然也会销毁，所以最终不会出现内存溢出。不过假如我们采用了线程池，某些核心线程的生命周期与整个应用绑定在一起，那么很有可能只有在整个应用 shutdown 的情况下，才能消除这种内存泄漏。
+
+所以在使用 ThreadLocal 的时候，强烈建议，在线程利用完当前任务 ThreadLocal 对象完成本次任务之前，调用 remove 方法显式删除 entry ， 这样就能百分之百避免内存泄漏的发生。如果没有显式调用 remove 方法，只能说大概率能保证不会出现内存泄漏，在即便这个概率达到 99.99999....% 也只能说大概率，而不是百分之百。
+
+到这里 ThreadLocalMap 的解读就基本结束了。
+
+# 总结
+
+本文主要对 ThreadLocal 类以源码顺序为逻辑进行了解析，首先通过引入一个线程需要保存自己的变量的问题提出 ThreadLocal 类的必要性，阅读源码过程中发现实际上 ThreadLocalMap 才是 ThreadLocal 核心类，接着对 ThreadLocalMap 的存储结构，谁家思想结合代码进行了层层分析。过程中学习到了两位作者各种精妙的算法设计和高效的代码逻辑，包括对 WeakReference 的使用，为什么 tab 表的长度是 2 次幂，探索式算法等等，本人阅读之后除了对 ThreadLocal 的源代码融汇贯通之外对于平时自己的工作过程中应该如何思考问题设计算法也受益良多。
 
 
-## 内存泄漏问题
-
-TODO
-
-## 参考文献
+# 参考文献
 
 1. [An Introduction to ThreadLocal in Java](https://www.baeldung.com/java-threadlocal)
 2. [Java ThreadLocal](http://tutorials.jenkov.com/java-concurrency/threadlocal.html)
