@@ -835,7 +835,7 @@ private void remove(ThreadLocal<?> key) {
 
 # 参考文献
 
-在学习过程中，查阅了大量网络上的各位的文章和文献，其中有些文章地址一时找不到了，在此将能找到的参考文献列出，供参考：
+在学习过程中，查阅了不少网络上的各位的文章和文献，其中有些文章地址一时找不到了，在此将能找到的参考文献列出，供参考：
 
 1. [An Introduction to ThreadLocal in Java](https://www.baeldung.com/java-threadlocal)
 2. [Java ThreadLocal](http://tutorials.jenkov.com/java-concurrency/threadlocal.html)
