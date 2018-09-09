@@ -785,8 +785,8 @@ private void resize() {
 至此，set 涉及到的所有操作都已经捋了一遍，描述一下：
 1. 首先计算 key 对应的 hashcode h ，从 h 开始线性探测，如果在第一次遇到 stale slot 或 null slot 之前找到 key 对应的 full entry ，则直接 set value；
 2. 如果 h 开始的线性探测过程中，在第一次遇到 null slot 之前发现 stale entry，则调用 replaceStaleEntry：
-   - 1.1 从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前找到 key 对应的 full entry ，那么先更新 full entry 的 value ，然后将 stale entry 与 full entry 交换；
-   - 1.2 从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前未找到 key ，则在 stale slot 位置直接创建一个 key 对应的新的 full entry ；
+   -  从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前找到 key 对应的 full entry ，那么先更新 full entry 的 value ，然后将 stale entry 与 full entry 交换；
+   -  从 stale slot 开始线性探测，如果在第一次遇到 null slot 之前未找到 key ，则在 stale slot 位置直接创建一个 key 对应的新的 full entry ；
    步骤2结束钱都会对 stale slot 所在 run 做一次连续段清理和探索式清理。
 3. 如果 h 开始的线性探测过程中，在第一次遇到 null slot 之前没有探测到 stale entry ，且没有探测到 key 对应的 full entry ， 则在这些连续 full entry 之后紧跟的 null slot 位置直接创建一个 key 对应的新的 full entry。
 4. set entry 的操作完成以后，如果发现 tab 的元素没有减少即没有 stale entry 被清理，且 tab 元素个数 size 超过阈值即 tab 的长度 length 的2/3，则调用一次 rehash() ，rehash() 会针对 tab 的每个索引做一次连续段清理，清理之后如果 tab 的元素个数 size 超过 3/4 阈值即 tab 长度的一半，则 tab 扩容为原来的两倍。
