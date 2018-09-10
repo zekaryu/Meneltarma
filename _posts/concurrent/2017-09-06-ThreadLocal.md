@@ -342,7 +342,12 @@ private Entry getEntry(ThreadLocal<?> key) {
     else
         return getEntryAfterMiss(key, i, e);
 }
+```
+程序流程图如下：
+![getentry](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/getEntry.png)
 
+
+```java
 /**
  * key 没有直接命中 hash slot 时的 getEntry 方法
  */
@@ -368,6 +373,9 @@ private Entry getEntryAfterMiss(ThreadLocal<?> key, int i, Entry e) {
     return null;
 }
 ```
+程序流程图如下：
+![getentry](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/getEntryAfterMiss.png)
+
 get 过程首先使用快速类似乐观锁的方法尝试命中 entry 以提高效率，如果没有命中，则以线性探测的方式寻找，找到同一个 key 则返回对应 entry ， 未找到则返回 null ，并且在寻找的同时，顺便调用 expungeStaleEntry 方法清理过期的 stale entry。
 
 #### set
@@ -424,6 +432,9 @@ private void set(ThreadLocal<?> key, Object value) {
         rehash();
 }
 ```
+程序流程图如下：
+![set](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/set.png)
+
 set() 中 replaceStaleEntry 和 cleanSomeSlots 方法最终调用了 expungeStaleEntry 方法，可以说 expungeStaleEntry 是 map 清理的核心算法：
 ```java
 /**
@@ -464,7 +475,7 @@ private int expungeStaleEntry(int staleSlot) {
             tab[i] = null;
             size--;
         // entry 为有效的 full entry，则 rehash
-        } else
+      } else {
             // 计算 hashcode
             int h = k.threadLocalHashCode & (len - 1);
             // 如果 entry 原本就在其对应 hashcode 所在的位置，则不做操作，完美！
@@ -549,6 +560,9 @@ private int expungeStaleEntry(int staleSlot) {
     return i;
 }
 ```
+程序流程图如下：
+![expungeStaleEntry](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/expungeStaleEntry.png)
+
 expungeStaleEntry 方法有人称之为“连续段清理”，比较贴切，它从 staleSlot 索引开始遍历直到出现一个 null slot ，这的确是一个没有 null slot 的连续段， 将这一段索引中所有 stale entry 清空，并将所有 full entry rehash 重新从它的 hashcode 进行线性探测 set 到新位置（当然如果参与 rehash 的当前 entry 对应的所有元素都是 full entry ，则这些 entry 还是会放回原来的位置）。
 
 下面接着看 cleanSomeSlots：
@@ -598,6 +612,9 @@ private boolean cleanSomeSlots(int i, int n) {
     return removed;
 }
 ```
+程序流程图如下：
+![cleanSomeSlots](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/cleanSomeSlots.png)
+
 cleanSomeSlots 方法比较简单，采用探索式的思想，人为选择从某索引开始 log2(n) 扫描次数进行全局清理，如果过程中真遇到需要清理的过期 stale entry，扫描次数会额外增加 log2(table.length)-1 次。
 
 然后再看一下最后一个与 set 有关的方法 replaceStaleEntry：
@@ -706,6 +723,9 @@ private void replaceStaleEntry(ThreadLocal<?> key, Object value,
     // 不需要清理
 }
 ```
+程序流程图如下：
+![replaceStaleEntry](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/replaceStaleEntry.png)
+
 replaceStaleEntry 方法做了两件事情：
 1.从 staleSlot 开始线性探测如果 tab 的其他位置原本就存在 key 对应的 entry ， 则首先更新 entry ，再将这个 entry 与需要替换的 staleSlot 位置的 stle entry 交换位置；如果探测直到出现第一个 null slot 都没有找到对应的 key ，那么就直接创建一个新的 entry set 到 staleSlot 位置。这一步真正完成了 replace 操作。
 2.与此同时顺便进行一波 stale entry 的清除：以 staleSlot 位置为参照点，进行两个方向的线性探测，确定 staleSlot 所处的 run 中的第一个 stale entry 所在的位置（staleSlot 位置除外，因为无论如何它被 replace 之后都是有效的 full slot），假如 run 中没有其他 stale entry 则算法结束，否则先进行一次连续段清除，再进行一次探索式（Heuristical）清除。
