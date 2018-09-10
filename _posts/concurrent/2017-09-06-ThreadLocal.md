@@ -150,7 +150,7 @@ public void set(T value) {
 在看源码之前有一点要注意， ThreadLocalMap 作为成员变量出现在 Thread 类中，说明每个线程都拥有一个独立的 ThreadLocalMap 实例，这符合 ThreadLocal 存储的数据线程隔离的特点下面可以一步一步开始解析源码。
 
 ![threadlocalmap结构](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocalmap-hierarchy.png)
-<center>图1 threadlocalmap结构图</center>
+<center>图1 ThreadLocalMap 类结构</center>
 
 看到 Entry 很容易让人想到 java.util.Map 的各种实现类中的 Entry，不过这里的 ThreadLocalMap 与 HashMap 等实现方式不同，ThreadLocalMap 并没有借助 java.util.Map 接口来实现，而是自己实现了一套 map 操作的逻辑。Entry 类中将 ThreadLocal 作为 key，value 为实际要存储的值，不过查看代码可以发现 Entry 继承了 WeakReference ，且在构造方法中对 key 调用了 super(k) ，所以其实 key 并不是 ThreadLocal 对象本身，而是 ThreadLocal 的 WeakReference ，至于为什么我们暂且按下不表，下文接着讨论。
 ```java
@@ -216,7 +216,9 @@ private static int prevIndex(int i, int len) {
 
 根据以上分析大致可以得知 ThreadLocalMap 存储结构如下如所示：
 
+
 ![threadlocalmap-model](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocalmap-model.png)
+<center>图2 ThreadLocalMap 内存模拟以及初始化代码示意图</center>
 
 实线表示的 StrongReference ，虚线表示的是 WeakReference。ThreadLocalMap 包含一个 Entry 环形数组 table ，数组中元素 Entry 的逻辑上的 key为某个 ThreadLocal 对象（实际上是指向该 ThreadLocal 对象的 WeakReference），value 为代码中该线程往该 ThreadLoacl 变量实际 set 的值。
 
@@ -224,9 +226,10 @@ private static int prevIndex(int i, int len) {
 
 到此我们已经有足够的知识积累，用来解释为什么使用 WeakReference ，写这篇文章之前我在网上看了多几篇讲 ThreadLocal 的文章，有些作者认为 WeakReference 这是整个 ThreadLocal 中的精髓，我也赞同这个看法，乍一看可能觉得多此一举，直接用 ThreadLocal 作为 key 保存数据好像也没什么问题，其实大有不同。幸亏我之前稍微熟悉了一下 [java中的Reference类型](https://www.numenor.cn/javalang/2017/09/04/reference.html) 其中总结 WeakReference 一句话：如果一个对象没有 StrongReference 但有存在一个 WeakReference ，那么 gc 将会在下一次运行时对其进行回收，哪怕虚拟机的内存还足够多。什么意思，就是说之所以 Entry 继承 WeakReference 是提醒 jvm 对 ThreadLocal 进行回收。那为什么要这么做？如果 Entry 对作为 key 的 ThreadLocal 进行 StrongReference 会出现什么情况？少废话，看图就能明白：
 
-![ThreadLocal 的数据存储结构](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocal-memory-model.png)
+![ThreadLocal 的数据存储堆栈图](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocal-memory-model.png)
+<center>图3 ThreadLocalMap 堆栈图</center>
 
-上图表示的某个线程执行过程中虚拟机堆栈与 ThreadLocal 有关的示意图。 thread 指向堆中的 threadObj 实例， threadObj 实例包含 ThreadLocalMap  threadLocals ， threadLocals 中某个 Entry 中 key 为对 threadlocalObj 的 WeakReference ，Value 为存储的值，ThreadLocal<?> ref1 引用指向 threadlocalObj 实例。于是图中 threadlocalObj 实例便有两个引用，一个是来自栈中 ThreadLocal ref1 的 StrongReference ， 另一个是 threadLocals 中某个 Entry 的 key ref2 的 WeakReference。
+图3表示的某个线程执行过程中虚拟机堆栈与 ThreadLocal 有关的示意图。 thread 指向堆中的 threadObj 实例， threadObj 实例包含 ThreadLocalMap  threadLocals ， threadLocals 中某个 Entry 中 key 为对 threadlocalObj 的 WeakReference ，Value 为存储的值，ThreadLocal<?> ref1 引用指向 threadlocalObj 实例。于是图中 threadlocalObj 实例便有两个引用，一个是来自栈中 ThreadLocal ref1 的 StrongReference ， 另一个是 threadLocals 中某个 Entry 的 key ref2 的 WeakReference。
 
 用java代码表示如下：
 ```java
@@ -241,14 +244,16 @@ ThreadLocal<?> ref2 = ref1;
 结构如下图：
 
 ![ThreadLocal 的数据存储结构 2 strong ](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocal-memory-model-2strong.png)
+<center>图4 不采用 WeakReference 的 ThreadLocalMap 堆栈图</center>
 
 现在如果在线程中对于 threadlocalObj 使用完毕，需要对其进行回收，通过以下方式通知jvm进行gc回收：
 ```java
 ThreadLocal<?> ref1 = null;
 ```
 ![ThreadLocal 的数据存储结构 1 strong ](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocal-memory-model-1strong.png)
+<center>图5 ref1 断开的还剩一个 StrongReference 的 ThreadLocalMap 堆栈图</center>
 
-然而，结果并没有如愿，虽然用户将 ref1 置为 null ，可是 threadlocalObj 还存在另一条来自 threadLocals 对应 Entry key ref2 的 StrongReference , 根据jvm回收内存的对象可达性判断，只要对象存在 StrongReference ，对象就不会被回收，所以用户以为此操作后 threadlocalObj 必然被回收，可是事实却事与愿违。这就导致了这个严重的问题，内存溢出，而且长此以往 threadLocals 只增不减，越积越多，问题相当严重啊！！！ 不过突然又有个想法既然如此能不能把另一个 ref2 也置为 null ，这样 threadlocalObj 就变成不可达对象不就可以回收了吗？这话完全正确，可是 ref2 哪里会知道它什么时候该置为 null ，毕竟操作 ref1 = null 的时候并没通知它啊？这问题该怎么解决呢，难道在需要开发一个通知机制在 ThreadLocal 置 null 的时候通知 ThreadLocalMap 删除对应的 Entry ? 其实也不是不可以，只不过jdk已经实现一种不需要额外开发也能达到同样通知效果的机制，那就是采用 WeakReference 。
+然而，结果并没有如愿，图5 中虽然用户将 ref1 置为 null ，可是 threadlocalObj 还存在另一条来自 threadLocals 对应 Entry key ref2 的 StrongReference , 根据jvm回收内存的对象可达性判断，只要对象存在 StrongReference ，对象就不会被回收，所以用户以为此操作后 threadlocalObj 必然被回收，可是事实却事与愿违。这就导致了这个严重的问题，内存溢出，而且长此以往 threadLocals 只增不减，越积越多，问题相当严重啊！！！ 不过突然又有个想法既然如此能不能把另一个 ref2 也置为 null ，这样 threadlocalObj 就变成不可达对象不就可以回收了吗？这话完全正确，可是 ref2 哪里会知道它什么时候该置为 null ，毕竟操作 ref1 = null 的时候并没通知它啊？这问题该怎么解决呢，难道在需要开发一个通知机制在 ThreadLocal 置 null 的时候通知 ThreadLocalMap 删除对应的 Entry ? 其实也不是不可以，只不过jdk已经实现一种不需要额外开发也能达到同样通知效果的机制，那就是采用 WeakReference 。
 
 在 WeakReference 引用情况下，做如下操作：
 ```java
@@ -257,6 +262,7 @@ ThreadLocal<?> ref1 = null;
 结果如图所示：
 
 ![ThreadLocal 的数据存储结构 1 weak ](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocal-memory-model-1weak.png)
+<center>图6 ref1 断开的还剩一个 WeakReference 的 ThreadLocalMap 堆栈图</center>
 
 此时用户将 ref1 置为 null ， WeakReference 与此前一样只剩下一个来自 threadLocals 对应 Entry key ref2 的引用，只不过这个时候并不是 StrongReference 而是 WeakReference , 回想 WeakReference 特点，WeakReference 引用的对象将在下一次 gc 的时候回收。换句话说，这边程序表示 threadlocalObj 这个对象我不用了，那边虚拟机立马检测到 threadlocalObj 对象只剩下一个 WeakReference 引用，于是自动在下次 gc 的时候回收对象。
 
@@ -309,9 +315,9 @@ private static int nextHashCode() {
 #### Entry 状态
 
 ![threadlocalmap结构2](http://meneltarma-pictures.nos-eastchina1.126.net/javalang/ThreadLocal/threadlocalmap-model2.png)
-<center>threadlocalmap结构图</center>
+<center>图7 ThreadLocalMap table数组结构图以及 Entry 类型</center>
 
-图中名词解释：
+图7 中名词解释：
 1. slot ：table 表中某个索引对应的位置（存放一个 entry）；
 2. Full slot = Full entry ：表示 table 中某个索引存放了一个 entry ，并且该 entry 的 WeakReference key 不为null ，且指向某个 threadlocalObj；
 3. Stale slot = Stale entry ： 字面意思为陈旧的 entry， 表示 table 中某个索引存放了一个陈旧的 entry ， 并且该 entry 的 WeakReference key 为 null。既然是“陈旧”的 entry ， 自然就是无效的需要清理的 entry；
