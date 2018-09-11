@@ -13,14 +13,14 @@
 # you will see them accessed via {{ site.title }}, {{ site.email }}, and so on.
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
-title: Z的技术博客
+title: Z
 email: zekaryu@gmail.com
 description: >- # this means to ignore newlines until "baseurl:"
-  这是我的个人技术博客，包括平时工作中自己的总结，外文翻译，源码分析等等。
+  这是我的个人博客，包括平时工作中自己的总结，外文翻译，源码分析等等。
 baseurl: "" # the subpath of your site, e.g. /blog
 url: "" # the base hostname & protocol for your site, e.g. http://example.com
 twitter_username:
-github_username:  zekaryu
+github_username:  z
 
 google_analytics:
 # cayman-blog date format
@@ -28,7 +28,7 @@ google_analytics:
 cayman-blog:
   date_format: "%b %-d, %Y"
 
-author: "Zekar Yu"
+author: "Z"
 # Build settings
 markdown: kramdown
 theme:
