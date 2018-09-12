@@ -30,7 +30,7 @@ layout: default
         <span class="post-meta">{{ post.date | date: date_format }}</span>
 
         <h2>
-          <a class="post-link" href="{{ post.url | relative_url }}" title="{{ post.title }}">[{{post.categories[0]}}] {{ post.title | escape }}</a>
+          <a class="post-link" href="{{ post.url | relative_url }}" title="{{ post.title }}">{{ post.title | escape }}</a>
         </h2>
 
         <span>{{ post.excerpt | markdownify | truncatewords: 10 }}</span>
