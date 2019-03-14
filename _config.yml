@@ -31,7 +31,6 @@ cayman-blog:
 author: "Z"
 # Build settings
 markdown: kramdown
-theme:
 plugins:
 - jekyll-feed
 
