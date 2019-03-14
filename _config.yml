@@ -31,7 +31,7 @@ cayman-blog:
 author: "Z"
 # Build settings
 markdown: kramdown
-theme:
+theme: jekyll-theme-cayman
 plugins:
   - jekyll-feed
 
@@ -53,4 +53,3 @@ excerpt_separator: "\n"
 
 
 
-theme: jekyll-theme-cayman
