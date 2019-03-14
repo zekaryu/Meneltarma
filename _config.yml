@@ -14,7 +14,7 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 title: Z
-email: 
+email:
 description: >- # this means to ignore newlines until "baseurl:"
   这是我的个人博客，包括平时工作中自己的总结，外文翻译，源码分析等等。
 baseurl: "" # the subpath of your site, e.g. /blog
@@ -31,9 +31,9 @@ cayman-blog:
 author: "Z"
 # Build settings
 markdown: kramdown
-theme: jekyll-theme-cayman
+theme:
 plugins:
-  - jekyll-feed
+- jekyll-feed
 
 paginate: 5
 paginate_path: "/page:num"
@@ -50,6 +50,3 @@ excerpt_separator: "\n"
 #   - vendor/cache/
 #   - vendor/gems/
 #   - vendor/ruby/
-
-
-

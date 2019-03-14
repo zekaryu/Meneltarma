@@ -1,6 +1,6 @@
 ---
 layout: page
 title: 联系我
-tagline: zekaryu@gmail.com  welcome to contact me!
+tagline:
 ---
-[zekaryu@gmail.com](mailto://zekaryu@gmail.com)  欢迎联系我！
+[](mailto://com)  欢迎联系我！
